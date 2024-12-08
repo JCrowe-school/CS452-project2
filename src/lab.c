@@ -13,7 +13,8 @@ struct queue {
     int size;
     bool shutdown;
     pthread_mutex_t mutex;
-    pthread_cond_t cond_empty, cond_full;
+    pthread_cond_t cond_empty;
+    pthread_cond_t cond_full;
 };
 
 queue_t queue_init(int capacity) {
