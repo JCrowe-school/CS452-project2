@@ -19,7 +19,7 @@ struct queue {
 queue_t queue_init(int capacity) {
     queue_t q = (queue_t)malloc(sizeof(struct queue));
     if(q == NULL) {perror("Failed to allocate memory for queue struct!"); exit(EXIT_FAILURE);}
-    q->array = (void **)malloc(sizeof(void *) * q->size);
+    q->array = (void **)malloc(sizeof(void *) * capacity);
     if(q->array == NULL) {perror("Failed to allocate memory for queue!"); free(q); exit(EXIT_FAILURE);}
     q->front = -1; //-1 serves to help mark as empty
     q->rear = -1;
