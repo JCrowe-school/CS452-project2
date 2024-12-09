@@ -44,6 +44,7 @@ void queue_destroy(queue_t q) {
     //if queue isn't empty, free what's left
     while(!is_empty(q)) {
         free(dequeue(q));
+        printf("Fresh produce into the incinerator!"); //debugging
     }
 
     //free queue, mutex stuff, and then the struct itself
@@ -59,19 +60,21 @@ void queue_destroy(queue_t q) {
 void enqueue(queue_t q, void *data) {
     pthread_mutex_lock(&q->mutex); //lock to ensure only one producer adds an item at a time
 
+    if(is_shutdown(q)) {pthread_mutex_unlock(&q->mutex); free(data); return;} //if in shutdown, free data exit immediately
+
     //check if the queue is full and wait if it is, using modulo to wrap back to the front if needed
     int nextRear = (q->rear + 1) % q->size;
-    while(nextRear == q->front && !is_shutdown(q)) {
-        pthread_cond_wait(&q->cond_full, &q->mutex);
+    while(nextRear == q->front) {
+        pthread_cond_signal(&q->cond_full); //signal consumers that there's a full queue
+        pthread_cond_wait(&q->cond_empty, &q->mutex); //wait for queue to be empty
     }
-
-    if(is_shutdown(q)) {pthread_mutex_unlock(&q->mutex); free(data); return;} //if in shutdown, free data exit immediately
 
     if(is_empty(q)) q->front = 0; //if queue is empty, set front to 0
     q->rear = nextRear;
     q->array[q->rear] = data;
 
-    pthread_cond_signal(&q->cond_empty); //signal consumers that there's items in the queue
+    //signal consumers if the queue is now full, otherwise signal producers
+    pthread_cond_signal(((q->rear + 1) % q->size) == q->front ? &q->cond_full : &q->cond_empty); 
     pthread_mutex_unlock(&q->mutex);
 }
 
@@ -83,7 +86,8 @@ void *dequeue(queue_t q) {
             pthread_mutex_unlock(&q->mutex);
             return NULL;
         } else {
-            pthread_cond_wait(&q->cond_empty, &q->mutex);
+            pthread_cond_signal(&q->cond_empty); //if queue is empty and we're not shutting down, signal producers
+            pthread_cond_wait(&q->cond_full, &q->mutex); //wait for queue to be full
         }
     }
 
@@ -95,7 +99,8 @@ void *dequeue(queue_t q) {
         q->front = (q->front + 1) % q->size; //otherwise increment front and use modulo for wrapping
     }
 
-    pthread_cond_signal(&q->cond_full); //signal producers that the queue is no longer full
+    //signal producers if the queue is now empty, otherwise signal consumers
+    pthread_cond_signal(is_empty(q) ? &q->cond_empty : &q->cond_full);
     pthread_mutex_unlock(&q->mutex);
 
     return data;
@@ -106,9 +111,9 @@ void queue_shutdown(queue_t q) {
 
     q->shutdown = true;
 
-    //signal waiting threads to start again
-    pthread_cond_broadcast(&q->cond_empty);
-    pthread_cond_broadcast(&q->cond_full);
+    //signal waiting consumers to start again as producers should be done
+    //pthread_cond_broadcast(&q->cond_empty); //producers
+    pthread_cond_broadcast(&q->cond_full); //consumers
 
     pthread_mutex_unlock(&q->mutex);
 }

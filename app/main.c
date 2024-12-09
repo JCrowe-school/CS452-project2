@@ -65,7 +65,7 @@ static void *producer(void *args)
           numproduced.num++;
           pthread_mutex_unlock(&numproduced.lock);
      }
-     // fprintf(stderr, "Producer thread: %ld - Done producing!\n", tid);
+     //fprintf(stderr, "Producer thread: %ld - Done producing %d items!\n", tid, num);
      pthread_exit(NULL);
 }
 
@@ -113,7 +113,7 @@ static void *consumer(void *args)
                break;
           }
      }
-     // fprintf(stderr, "Consumer Thread: %ld - Done consuming!\n", tid);
+     //fprintf(stderr, "Consumer Thread: %ld - Done consuming!\n", tid);
      pthread_exit(NULL);
 }
 
